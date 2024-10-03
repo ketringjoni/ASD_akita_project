@@ -1,7 +1,6 @@
 # De novo structural variants in autism spectrum disorder disrupt distal regulatory interactions of neuronal genes
-***
 
-## Abstract
+# Abstract
 **Background:** Three-dimensional genome organization plays a critical role in gene regulation, and disruption of chromatin structure has been shown to lead to developmental disorders through the changed contact between key genes and their distal regulatory elements. Structural variants (SVs) have the ability to disrupt local genome organization, such as the joining of topologically associated domains upon deletion of a boundary. Testing large numbers of SVs for their effects on chromatin structure and gene expression is time and cost prohibitive. To overcome these experimental limitations, we propose to predict the effects of SVs on genome folding computationally and use the results to prioritize causal hypotheses to test in cells. 
 
 **Results:** We developed a weighted scoring method to measure chromatin contact changes that specifically affect regions of interest, such as cell type-specific regulatory elements or promoters. We implemented this scoring approach in the SuPreMo-Akita software package and used it to  rank hundreds of de novo SVs (dnSVs) from autism spectrum disorder (ASD) individuals and their unaffected siblings based on predictions of how they alter the neuronal regulatory interactions of nearby genes. This revealed that putative cis-regulatory element interactions (CREints) are more disrupted by dnSVs from ASD probands versus unaffected siblings, allowing us to prioritize candidate ASD variants that disrupt CREints of genes involved in the disorder. We experimentally validated our top locus using isogenic induced pluripotent stem cell-derived excitatory neurons with and without the dnSV, finding that our prediction of disrupted contacts in the locus was highly accurate. RNA-seq analysis identified 1,102 mis-regulated genes in cell lines with the dnSV. This in vitro characterization of a candidate causal variant is important, because most ASD patients do not carry a damaging protein-coding variant that alters neurodevelopment or neuronal function. 
@@ -12,15 +11,15 @@
 
 ## In this repo
 
-1. Simons Simplex Collection dnSVs
-2. Scoring SSC dnSVs with SuPreMo-Akita
-3. Scoring SSC snSVs with CREint weights
-4. Filtering SSC dnSVs using selection criteria
-5. HiC data analysis
-6. RNAseq data analysis
+1. [Simons Simplex Collection dnSVs](https://github.com/ketringjoni/ASD_akita_project/tree/main?tab=readme-ov-file#1-simons-simplex-collection-dnSVs)
+2. [Scoring SSC dnSVs with SuPreMo-Akita](https://github.com/ketringjoni/ASD_akita_project/tree/main?tab=readme-ov-file#2-scoring-ssc-dnsvs-with-SuPreMo-Akita)
+3. [Scoring SSC snSVs with CREint weights](https://github.com/ketringjoni/ASD_akita_project/tree/main?tab=readme-ov-file#3-scoring-ssc-snsvs-with-creint-weights)
+4. [Filtering SSC dnSVs using selection criteria](https://github.com/ketringjoni/ASD_akita_project/tree/main?tab=readme-ov-file#4-filtering-ssc-dnsvs-using-selection-criteria)
+5. [HiC data analysis](https://github.com/ketringjoni/ASD_akita_project/tree/main?tab=readme-ov-file#5-hic-data-analysis)
+6. [RNAseq data analysis](https://github.com/ketringjoni/ASD_akita_project/tree/main?tab=readme-ov-file#6-rnaseq-data-analysis)
 
 
-### 1. SSC dnSVs
+### 1. Simons Simplex Collection dnSVs
 
 De novo structural variants used in this study are from Simons Simplex Collection (SSC), as a part of Simons Foundation Autism Research Initiative (SFARI). Belyeu et al 2021 called dnSVs in hg38 using alignment-based, short-read WGS, and we pulled them from their Supplementary Table 1 into [data/SFARI_SSC_dnSVs.csv](https://github.com/ketringjoni/ASD_akita_project/data/SFARI_SSC_dnSVs.csv).
 
@@ -41,7 +40,7 @@ SuPreMo/scripts/SuPreMo.py data/SSC_dnSV_for_SuPreMo.txt \
 Our steps to process the input and output files are in [scoring_dnSVs.ipynb under Scoring dnSVs using SuPreMo-Akita](https://github.com/ketringjoni/ASD_akita_project/scoring_dnSVs/scoring_dnSVs.ipynb#Scoring-dnSVs-using-SuPreMo-Akita).
 
 
-### 3. Getting CREints from PLACseq data
+### 3.Scoring SSC snSVs with CREint weights
 
 CREints were processed from Song et al 2020 excitatory neuron H3K4me3 PLACseq data, pulled from [NeMO](https://assets.nemoarchive.org/dat-uioqy8b) into [data/eN.MAPS.peaks.txt](https://github.com/ketringjoni/ASD_akita_project/data/eN.MAPS.peaks.txt).
 
