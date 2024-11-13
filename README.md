@@ -4,7 +4,7 @@
 
 Three-dimensional genome organization plays a critical role in gene regulation, and disruptions can lead to developmental disorders by altering the contact between genes and their distal regulatory elements. Structural variants (SVs) can disturb local genome organization, such as the merging of topologically associating domains upon boundary deletion. Testing large numbers of SVs experimentally for their effects on chromatin structure and gene expression is time and cost prohibitive. To address this, we propose a computational approach to predict SV impacts on genome folding, which can help prioritize causal hypotheses for functional testing. We developed a weighted scoring method that measures chromatin contact changes specifically affecting regions of interest, such as regulatory elements or promoters, and implemented it in the SuPreMo-Akita software (Gjoni and Pollard 2024). With this tool, we ranked hundreds of de novo SVs (dnSVs) from autism spectrum disorder (ASD) individuals and their unaffected siblings based on predicted disruptions to nearby neuronal regulatory interactions. This revealed that putative cisregulatory element interactions (CREints) are more disrupted by dnSVs from ASD probands versus unaffected siblings. We prioritized candidate variants that disrupt ASD CREints and validated our top-ranked locus using isogenic excitatory neurons with and without the dnSV, confirming accurate predictions of disrupted chromatin contacts. This study establishes disrupted genome folding as a potential genetic mechanism in ASD and provides a general strategy for prioritizing variants predicted to disrupt regulatory interactions across tissues.
 
-[bioRxiv](https://www.biorxiv.org/content/10.1101/2024.11.06.621353v1)
+[Preprint on bioRxiv](https://www.biorxiv.org/content/10.1101/2024.11.06.621353v1)
 
 ***
 
@@ -38,7 +38,7 @@ python SuPreMo/scripts/SuPreMo.py variant_scoring/supremo-akita_input/dnSVs_for_
 Our steps to process the input and output files are in [variant_scoring/scoring_dnSVs.ipynb](https://github.com/ketringjoni/ASD_akita_project/blob/main/variant_scoring/scoring_dnSVs.ipynb#Scoring-dnSVs-using-SuPreMo-Akita).
 
 
-### 3.Scoring SSC dnSVs with CREint weights
+### 3. Scoring SSC dnSVs with CREint weights
 
 CREints were processed from [Song et. al. 2020](https://pubmed.ncbi.nlm.nih.gov/33057195/) excitatory neuron H3K4me3 PLACseq data, pulled from [NeMO](https://assets.nemoarchive.org/dat-uioqy8b) into [data/eN.MAPS.peaks.txt](https://github.com/ketringjoni/ASD_akita_project/blob/main/data/eN.MAPS.peaks.txt).
 
@@ -56,14 +56,14 @@ python SuPreMo/scripts/SuPreMo.py variant_scoring/supremo-akita_input_weighted/E
 Our steps to process the input and output files are in [variant_scoring/scoring_dnSVs.ipynb](https://github.com/ketringjoni/ASD_akita_project/blob/main/variant_scoring/scoring_dnSVs.ipynb#Scoring-dnSVs-near-CREints-using-SuPreMo-Akita-with-weighted-scoring).
 
 
-### 5. Filtering SSC dnSVs using selection criteria
+### 4. Filtering SSC dnSVs using selection criteria
 
-We defined a set of criteria to prioritize variants that are likely to be causal and can feasibly be tested in excitatory neuronal cells. The criteria and the variant that pass them (data for Figure S3A-B) are in [variant_prioritization/prioritizing_dnSVs.ipynb](https://github.com/ketringjoni/ASD_akita_project/blob/main/variant_prioritization/prioritizing_dnSVs.ipynb).
+We defined a set of criteria to prioritize variants that are likely to be causal and can feasibly be tested in excitatory neuronal cells. The criteria and the variants that pass them (data for Figure S3A-B) are in [variant_prioritization/prioritizing_dnSVs.ipynb](https://github.com/ketringjoni/ASD_akita_project/blob/main/variant_prioritization/prioritizing_dnSVs.ipynb).
 
 
-### 6. HiC data analysis
+### 5. HiC data analysis
 
-To process hic fastq files into mcool files, we use the [4DN pipeline](https://data.4dnucleome.org/resources/data-analysis/hi_c-processing-pipeline). The code in [HiCanalyses/hic_analysis.sh](https://github.com/ketringjoni/ASD_akita_project/HiCanalyses/hic_analysis.sh) has beed adapted from the [4DN HiC Docker GitHub repo](https://github.com/4dn-dcic/docker-4dn-hic/tree/master). We used pacakge versions shown in [HiCanalyses/hic_analyses.yml](https://github.com/ketringjoni/ASD_akita_project/HiCanalyses/hic_analysis.sh) and ran:
+To process HiC fastq files into mcool files, we use the [4DN pipeline](https://data.4dnucleome.org/resources/data-analysis/hi_c-processing-pipeline). The code in [HiCanalyses/hic_analysis.sh](https://github.com/ketringjoni/ASD_akita_project/HiCanalyses/hic_analysis.sh) has beed adapted from the [4DN HiC Docker GitHub repo](https://github.com/4dn-dcic/docker-4dn-hic/tree/master). We used pacakge versions shown in [HiCanalyses/hic_analyses.yml](https://github.com/ketringjoni/ASD_akita_project/HiCanalyses/hic_analysis.sh) and ran:
 
 ```
 hic_analyses.sh <nthreads>, <genome_index>, <chrom_sizes>, <fastq1_rep1>, <fastq2_rep1>, <fastq1_rep2>, <fastq2_rep2>, <prefix_rep1>, <prefix_rep2>, <prefix>, <outdir>, <hic_analysis_path>
@@ -72,7 +72,7 @@ hic_analyses.sh <nthreads>, <genome_index>, <chrom_sizes>, <fastq1_rep1>, <fastq
 Raw and analyzed HiC data can be found in GEO (accession number GSE281283).
 
 
-### 7. RNAseq data analysis
+### 6. RNAseq data analysis
 *TBD*
 
 Raw and analyzed RNAseq data can be found in GEO (accession number GSE281327).
