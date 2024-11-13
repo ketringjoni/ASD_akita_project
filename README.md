@@ -8,22 +8,22 @@ Three-dimensional genome organization plays a critical role in gene regulation, 
 
 ***
 
-## In this repo
+In this repo:
 
 1. [Simons Simplex Collection dnSVs](https://github.com/ketringjoni/ASD_akita_project/tree/main?tab=readme-ov-file#1-simons-simplex-collection-dnSVs)
 2. [Scoring SSC dnSVs with SuPreMo-Akita](https://github.com/ketringjoni/ASD_akita_project/tree/main?tab=readme-ov-file#2-scoring-ssc-dnsvs-with-SuPreMo-Akita)
-3. [Scoring SSC snSVs with CREint weights](https://github.com/ketringjoni/ASD_akita_project/tree/main?tab=readme-ov-file#3-scoring-ssc-snsvs-with-creint-weights)
+3. [Scoring SSC dnSVs with CREint weights](https://github.com/ketringjoni/ASD_akita_project/tree/main?tab=readme-ov-file#3-scoring-ssc-dnsvs-with-creint-weights)
 4. [Filtering SSC dnSVs using selection criteria](https://github.com/ketringjoni/ASD_akita_project/tree/main?tab=readme-ov-file#4-filtering-ssc-dnsvs-using-selection-criteria)
 5. [HiC data analysis](https://github.com/ketringjoni/ASD_akita_project/tree/main?tab=readme-ov-file#5-hic-data-analysis)
 6. [RNAseq data analysis](https://github.com/ketringjoni/ASD_akita_project/tree/main?tab=readme-ov-file#6-rnaseq-data-analysis)
 
 
-### 1. Simons Simplex Collection dnSVs
+## 1. Simons Simplex Collection dnSVs
 
 De novo structural variants used in this study are from Simons Simplex Collection (SSC), as a part of Simons Foundation Autism Research Initiative (SFARI). Belyeu et al 2021 called dnSVs in hg38 using alignment-based, short-read WGS, and we pulled them from their Supplementary Table 1 into [data/SFARI_SSC_dnSVs.csv](https://github.com/ketringjoni/ASD_akita_project/blob/main/data/SFARI_SSC_dnSVs.csv).
 
 
-### 2. Scoring SSC dnSVs with SuPreMo-Akita
+## 2. Scoring SSC dnSVs with SuPreMo-Akita
 
 We installed [SuPreMo-Akita](https://github.com/ketringjoni/SuPreMo?tab=readme-ov-file#install-supremo-or-supremo-akita) and cloned the SuPreMo repo into this repo. 
 
@@ -38,7 +38,7 @@ python SuPreMo/scripts/SuPreMo.py variant_scoring/supremo-akita_input/dnSVs_for_
 Our steps to process the input and output files are in [variant_scoring/scoring_dnSVs.ipynb](https://github.com/ketringjoni/ASD_akita_project/blob/main/variant_scoring/scoring_dnSVs.ipynb#Scoring-dnSVs-using-SuPreMo-Akita).
 
 
-### 3. Scoring SSC dnSVs with CREint weights
+## 3. Scoring SSC dnSVs with CREint weights
 
 CREints were processed from [Song et. al. 2020](https://pubmed.ncbi.nlm.nih.gov/33057195/) excitatory neuron H3K4me3 PLACseq data, pulled from [NeMO](https://assets.nemoarchive.org/dat-uioqy8b) into [data/eN.MAPS.peaks.txt](https://github.com/ketringjoni/ASD_akita_project/blob/main/data/eN.MAPS.peaks.txt).
 
@@ -56,12 +56,12 @@ python SuPreMo/scripts/SuPreMo.py variant_scoring/supremo-akita_input_weighted/E
 Our steps to process the input and output files are in [variant_scoring/scoring_dnSVs.ipynb](https://github.com/ketringjoni/ASD_akita_project/blob/main/variant_scoring/scoring_dnSVs.ipynb#Scoring-dnSVs-near-CREints-using-SuPreMo-Akita-with-weighted-scoring).
 
 
-### 4. Filtering SSC dnSVs using selection criteria
+## 4. Filtering SSC dnSVs using selection criteria
 
 We defined a set of criteria to prioritize variants that are likely to be causal and can feasibly be tested in excitatory neuronal cells. The criteria and the variants that pass them (data for Figure S3A-B) are in [variant_prioritization/prioritizing_dnSVs.ipynb](https://github.com/ketringjoni/ASD_akita_project/blob/main/variant_prioritization/prioritizing_dnSVs.ipynb).
 
 
-### 5. HiC data analysis
+## 5. HiC data analysis
 
 To process HiC fastq files into mcool files, we use the [4DN pipeline](https://data.4dnucleome.org/resources/data-analysis/hi_c-processing-pipeline). The code in [HiCanalyses/hic_analysis.sh](https://github.com/ketringjoni/ASD_akita_project/HiCanalyses/hic_analysis.sh) has beed adapted from the [4DN HiC Docker GitHub repo](https://github.com/4dn-dcic/docker-4dn-hic/tree/master). We used pacakge versions shown in [HiCanalyses/hic_analyses.yml](https://github.com/ketringjoni/ASD_akita_project/HiCanalyses/hic_analysis.sh) and ran:
 
@@ -72,7 +72,7 @@ hic_analyses.sh <nthreads>, <genome_index>, <chrom_sizes>, <fastq1_rep1>, <fastq
 Raw and analyzed HiC data can be found in GEO (accession number GSE281283).
 
 
-### 6. RNAseq data analysis
+## 6. RNAseq data analysis
 *TBD*
 
 Raw and analyzed RNAseq data can be found in GEO (accession number GSE281327).
