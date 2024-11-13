@@ -73,10 +73,16 @@ Raw and analyzed HiC data can be found in GEO (accession number GSE281283).
 
 
 ## 6. RNAseq data analysis
-*TBD*
+
+The differential gene expression and Gene Ontology enrichment analysis can be visualized in [DEXanalysis.html](https://github.com/ketringjoni/ASD_akita_project/blob/main//rnaseq/input_data/DEXanalysis.html). (Note: HTMLs need to be downloaded from github and then opened). All package versions are contained within and the associated R notebook can be used to re-run the code. 
+The normalized counts, differential gene lists, enriched go terms, and figures can all be found in `rnaseq/dex_output/`.
+
+The required inputs are located in `rnaseq/input_data/` and include:
+* `/star` -- contains the gene count matrix output from STAR v2.7.11b following the alignment to GRCh38.112 in gene annotation mode.
+* `/bamqc` -- contains the quality control metrics generated using Picard v3.1.1
+* `multiqc_report.html` -- coallates quality metrics from programs above and fastqc 
 
 Raw and analyzed RNAseq data can be found in GEO (accession number GSE281327).
-
 
 ***
 *For any questions and/or feedback, please reach out to katie.gjoni at ucsf dot edu*
