@@ -1,0 +1,633 @@
+---
+title: "RNAseq Analysis candidate dnSVs: Katie Gjoni"
+output:
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+---
+
+
+__Author:__ Amanda Everitt  
+__Began:__ 06/12/24   
+__Finished:__ 09/04/24           
+
+```{r, warning=FALSE}
+suppressPackageStartupMessages({
+  library(plyr); library(dplyr); library(tidyr)
+  library(DESeq2)
+  library(ggplot2)
+  library(tibble)
+  library(gridExtra)
+  library(ggbiplot)
+  library(biomaRt)
+  library(ComplexHeatmap)
+  library(kableExtra)
+  library(ggrepel)
+  library(circlize)
+  library(stringr)
+})
+
+data_dir ="input_data/"
+output_dir ="dex_output/"
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(paste0(output_dir,"figures"), recursive = TRUE, showWarnings = FALSE)
+
+par(mar=c(1,1,1,1), cex.axis=0.5, mfrow=c(1,1))
+set.seed(1)
+`%ni%` <- purrr::compose(`!`, `%in%`)
+```
+
+```{r, eval=FALSE, include=FALSE}
+##load this file to skip to plotting steps for revisions
+load(file = paste0(output_dir, "figures/Plotting_checkpoint.Rdata"))
+```
+
+## Load in matrices.
+```{r}
+#Load counts
+cts <- read.delim(paste0(data_dir,"star/gjoni_bulkRNAseq_ASD.txt"), sep = "\t", row.names = 1)
+original_cts <- cts
+cts[1:3,1:4]
+```
+
+```{r}
+#make a quick metadata sheet 
+tmp = gsub("whole_", "", colnames(cts))
+tmp = gsub("P37_", "", tmp)
+metadata <- data.frame(sampleID = colnames(cts), 
+                       condition = sapply(strsplit(tmp, "_"), function(x) x[1]),
+                       clone_number = sapply(strsplit(tmp, "_"), function(x) x[2]),
+                       lane = sapply(strsplit(tmp, "_"), function(x) x[3])
+                       )
+metadata
+```
+
+```{r, warning=FALSE}
+#Load QC metrics
+qc1 <- t(read.delim(paste0(data_dir,"star/gjoni_bulkRNAseq_ASD.stats"), sep = "\t", row.names = 1))
+qc2 <- read.delim(paste0(data_dir,"bamqc/gjoni_bulkRNAseq_ASD_merged_qc.txt"), sep = "\t", row.names = 1)
+qc_df <- merge(qc1, qc2, by="row.names", all=T)
+rownames(qc_df) <- qc_df$Row.names; qc_df <- qc_df[, -1]
+
+qc_df <- qc_df[, as.numeric(which(apply(qc_df, 2, var) > 0 ))] #remove cols with no variance
+qc_df <- as.data.frame(t(qc_df))
+if(identical(colnames(qc_df), colnames(cts))){
+  qc_df["N_reads_mapped", ] <- colSums(cts)
+}
+qc_df[1:3,1:4]
+```
+
+```{r, fig.height=7, fig.width=12}
+#Is there anything concerning in how the reads were mapped to the genome?
+#no. 
+par(cex=1, mar = c(10,5,3,1), xpd=TRUE)
+a<- as.matrix(qc_df[rownames(qc_df) %in% c("N_reads_mapped", "N_unmapped","N_multimapping","N_noFeature","N_ambiguous"),])
+barplot(a, main="Breakdown of Read distribution by sample",
+  col=c("orange","pink", "red","green","darkblue"),
+ 	legend = rownames(a),
+  las=2, 
+  args.legend = list(x="bottomright", cex=0.5) )
+```
+```{r, warning=FALSE}
+pca <- prcomp(t(qc_df), center = T, scale. = T)
+percentVar <- pca$sdev^2/sum(pca$sdev^2)
+metadata %>%
+    mutate(PC1 = pca$x[, 1], PC2 = pca$x[, 2]) %>% 
+    ggplot(aes(x = PC1, y = PC2, color=condition, shape=lane, label=sampleID)) +
+    geom_point(size = 3) + 
+    coord_fixed() + theme_bw() +
+    xlab(paste0("PC1: ", round(percentVar[1] * 100), "% variance")) + 
+    ylab(paste0("PC2: ", round(percentVar[2] * 100), "% variance")) + 
+    ggtitle("PCA of QC metrics") +
+    geom_text(size=4, nudge_x = 0.5)
+```
+```{r, fig.height=7, fig.width=7}
+ggbiplot(pca) + theme_bw() + ggtitle("Biplot showing qc metrics + loadings")
+```
+
+
+#### Filter zero + lowly expressed genes out. 
+```{r}
+amanda.plot.density <- function(df, title, my.ylim, my.xlim){
+  library(RColorBrewer)
+  colramp= colorRampPalette(brewer.pal(4, "BuPu"))(ncol(df))
+  plot(density(df[,1]),col="white",lwd=3,ylim=my.ylim, xlim=my.xlim, main=title)
+  for(i in 1:ncol(df)){lines(density(df[,i]),lwd=1,col=colramp[i])}
+}
+```
+
+```{r}
+par(cex=1, mar = c(3,3,3,3), xpd=FALSE, mfrow=c(3,1))
+cpm <- apply(cts,2, function(x) (x/sum(x))*1000000)
+amanda.plot.density(log2(cpm + 1), 
+                    title=paste0("Original counts (n=",dim(cpm)[1],")"), 
+                    my.ylim =c(0,0.5),  my.xlim= c(-1,15))
+cpm <- cpm[rowSums(cpm) > 0,]
+amanda.plot.density(log2(cpm + 1), 
+                    title=paste0("Zero removed counts (n=",dim(cpm)[1],")"), 
+                    my.ylim =c(0,0.5),  my.xlim= c(-1,15))
+cpm <- cpm[rowSums(cpm > 2) >= 2,]
+amanda.plot.density(log2(cpm + 1), 
+                    title=paste0("LowExpr filtered counts (n=",dim(cpm)[1],")\n[required > 2 cpm in >= 2 samples]"),
+                    my.ylim =c(0,0.5),  my.xlim= c(-1,15))
+
+norm_counts <- log2(cpm + 1)
+cts <- cts[rownames(cts) %in% rownames(norm_counts), ] #remove those filtered out. 
+```
+
+```{r}
+pca <- prcomp(t(norm_counts), center = T)
+percentVar <- pca$sdev^2/sum(pca$sdev^2)
+pc1lab = paste0("PC1: ", round(percentVar[1] * 100), "% variance"); 
+pc2lab = paste0("PC2: ", round(percentVar[2] * 100), "% variance")
+pca_data = metadata %>% mutate(PC1 = pca$x[, 1], PC2 = pca$x[, 2])
+
+#wes_palette("AsteroidCity3")[1]
+pca_data$condition <- toupper(pca_data$condition)
+pca_data$shortened_sample = paste0(pca_data$condition, "_rep", rep(c(1,2), 3))
+p1 <- ggplot(pca_data, aes(x = PC1, y = PC2, color=condition, label=shortened_sample)) +
+    geom_point(size = 3) + coord_fixed() + 
+    scale_color_manual(values=c("#FBA72A","#CB7A5C", "#5785C1"), name="Condition") + 
+    xlab(pc1lab) + ylab(pc2lab) + theme_bw() +
+    ggtitle("Principal Component Analysis") + 
+    geom_text_repel(size = 3, nudge_x=0.5)
+p1
+ggsave(plot=p1, file=paste0(output_dir, "figures/PCA.svg"), width=6, height=6)
+```
+
+
+#### Let's save our normalized + filtered counts. 
+```{r class.source = 'fold-show'}
+write.csv(cts, file=paste0(output_dir, "filtered_counts.csv"))
+write.csv(norm_counts, file=paste0(output_dir, "norm_counts.csv"))
+```
+
+## Differential Expression
+```{r}
+#retrieve gene names from biomart. 
+ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+gene_info <- getBM(
+    attributes = c("ensembl_gene_id", "hgnc_symbol", "entrezgene_id"),
+    filters = "ensembl_gene_id",
+    values = rownames(cts),
+    mart = ensembl
+)
+```
+
+```{r}
+metadata$condition <- as.factor(metadata$condition)
+metadata$condition <- relevel(metadata$condition, ref="WT")
+#note, because we created the metadata based on columns, they are naturally in the right order. if you upload
+#a different file you may need to confirm that and order the columns accordingly. 
+```
+
+```{r DESeq2, message=F, warning=F}
+dds <- DESeqDataSetFromMatrix(countData = cts, #raw counts, but filtered to those that are expressed at a reasonable level.
+                              colData = metadata,
+                              design = ~ condition)
+dds <- DESeq(dds)
+ddsnorm <- counts(dds, normalized=TRUE)
+resultsNames(dds)
+```
+
+<details>
+  <summary>**Picking shrinkage**</summary>
+```{r}
+#library(apeglm)
+resNorm <- lfcShrink(dds, coef=2, type="normal")
+resLFC <- lfcShrink(dds, coef=2, type="apeglm")
+resAsh <- lfcShrink(dds, coef=2, type="ashr")
+par(mfrow=c(1,3), mar=c(4,4,2,1))
+xlim <- c(1,1e5); ylim <- c(-3,3)
+plotMA(resLFC, xlim=xlim, ylim=ylim, main="apeglm")
+plotMA(resNorm, xlim=xlim, ylim=ylim, main="normal")
+plotMA(resAsh, xlim=xlim, ylim=ylim, main="ashr")
+```
+</details>
+
+```{r}
+#FUNCTIONS
+amanda.volcano.plot <- function(results, title, gene.list=NA, FCcut = 0, Padjcut = 0.05){
+    results <- data.frame(results)
+    results <- results[!is.na(results$padj) & !is.na(results$log2FoldChange) ,]
+    results$sig <- as.factor(ifelse(results$padj <= Padjcut & abs(results$log2FoldChange) > FCcut, "sig", "notsig"))
+    to_label <- results[results$hgnc_symbol %in% gene.list, ]
+    p1 <- ggplot(results, aes(x=log2FoldChange, y=-log10(padj), col=sig)) + 
+        geom_point(aes(color = sig)) +
+        ggtitle(title) +
+        xlab("log2FC") + ylab("-log10(padj)") +
+        scale_colour_manual(values = c("black", "red3"), name ="", labels=c("not signficant", "significant")) +
+        theme_bw() + 
+        theme(legend.justification=c(1,1), legend.position=c(1,1), legend.title = element_blank(), 
+              legend.background = element_rect(fill="transparent", linewidth=0.5, linetype="solid", color = "black")) +
+        ggrepel::geom_text_repel(data=to_label, aes(label=hgnc_symbol), show.legend = F, size=2) +
+        geom_vline(xintercept = c(FCcut,-1*FCcut), color="blue", linetype="dashed", linewidth=0.5) + 
+        geom_hline(yintercept = -log10(Padjcut), color="blue", linetype="dashed", linewidth=0.5) +
+        NULL
+    return(p1)
+}
+```
+
+
+### KO vs WT
+```{r}
+res = lfcShrink(dds, coef=3, quiet = TRUE)
+ko_vs_WT_res <- res %>% as.data.frame() %>% 
+  rownames_to_column(var="ensembl_gene_id") %>% 
+  left_join(gene_info, by="ensembl_gene_id") 
+ko_vs_WT_sig <- ko_vs_WT_res %>% 
+  filter(!is.na(padj), padj < 0.05) %>% 
+  arrange(padj)
+```
+
+```{r}
+cat("Number of DEX genes:", nrow(ko_vs_WT_sig))
+ko_vs_WT_sig %>% 
+  kbl() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>% 
+  scroll_box(width = "800px", height = "400px")
+```
+
+```{r}
+id = ko_vs_WT_sig %>% dplyr::arrange(desc(abs(log2FoldChange))) %>% head(n=30) %>% pull(ensembl_gene_id)
+
+l = data.frame(ko_vs_WT_res)
+l$sig = ifelse(l$padj > 0.05 | is.na(l$padj), "NS", ifelse(l$log2FoldChange >0, "up", "down"))
+l$sig <- as.factor(l$sig); l$sig <- factor(l$sig, levels=c("down", "up", "NS"))
+
+g1 <- ggplot(l, aes(x=log2(baseMean), y=log2FoldChange, col=sig)) + 
+    geom_point(size=2) + 
+    scale_color_manual(values=c("darkblue", "#A30000", "grey"), name="", 
+                       lab=c(paste0("Down: ",table(l$sig)[["down"]]), 
+                             paste0("  Up: ", table(l$sig)[["up"]])), "NS") +
+    ylim(c(-5.1, 4)) +
+    theme_bw() + 
+    xlab("Log2 Mean Expression") + ylab("Log2 Fold Change") + 
+    ggtitle("KO vs WT: MA plot\n ") + 
+    guides(color = guide_legend(direction = "horizontal")) +
+    ggrepel::geom_text_repel(data=l[l$ensembl_gene_id %in% id, ], aes(label=hgnc_symbol), 
+                             show.legend = F, size=2, box.padding = 0.5, segment.color = NA) +
+    theme(text=element_text(size=12, face = "bold"),
+          plot.title = element_text(hjust = 0.5),
+          legend.position=c(1, 1.09),
+          legend.justification="right")
+#ggsave(plot=g1, file=paste0(output_dir, "figures/MAPlot.svg"), width=10, height=8)
+g1
+```
+
+```{r}
+l = data.frame(ko_vs_WT_res)
+l$sig = ifelse(l$padj > 0.05 | is.na(l$padj), "NS", ifelse(l$log2FoldChange > 0, "up", "down"))
+l$sig <- as.factor(l$sig); l$sig <- factor(l$sig, levels=c("down", "up", "NS"))
+
+l$log10padj = -log10(l$padj)
+l$shape = 16
+l[l$log10padj > 45, "log10padj"] = 45
+l[l$log10padj == 45, "shape"] = -9650
+
+l[l$log2FoldChange < -3, "log2FoldChange"] = -3
+l[l$log2FoldChange == -3, "shape"] = -9668
+l$shape <- as.factor(l$shape); l$shape <- factor(l$shape, levels=c(16, -9650, -9668))
+
+id = unique(
+  c(l %>% filter(sig != "NS") %>% filter(log2FoldChange > 1)  %>% pull(ensembl_gene_id),
+    l %>% filter(sig != "NS") %>% filter(log2FoldChange < -2)  %>% pull(ensembl_gene_id),
+    l %>% filter(sig != "NS") %>% filter(log10padj > 15)  %>% pull(ensembl_gene_id))
+  )
+
+g1 <- ggplot(l, aes(x=log2FoldChange, y=log10padj, col=sig, shape=shape)) + 
+    geom_point(size=2) + 
+    scale_color_manual(values=c("darkblue", "#A30000", "grey"),  
+                       lab=c(paste0("Down: ",table(l$sig)[["down"]]), 
+                             paste0("Up: ", table(l$sig)[["up"]]), "NS")) +
+    scale_shape_manual(values = c(16, -9650, -9668)) +
+    ylim(c(0, 45)) +
+    xlim(c(-3, 3)) + 
+    theme_bw() + 
+    xlab("log2 Fold Change") + ylab("-log Adjusted Pvalue") + 
+    ggtitle("KO vs WT") + 
+    guides(color = guide_legend(direction = "vertical", title=NULL), shape="none") +
+    ggrepel::geom_text_repel(data=l[l$ensembl_gene_id %in% id, ], aes(label=hgnc_symbol), 
+                             show.legend = F, size=2, box.padding = 0.2, segment.color = NA, 
+                             nudge_x = 0.1, nudge_y = -0.1) +
+    theme(text=element_text(size=12, face = "bold"),
+          plot.title = element_text(hjust = 0.5), 
+          legend.justification = c(0.99, 0.99), 
+          legend.position = c(0.99, 0.99))
+
+ggsave(plot=g1, file=paste0(output_dir, "figures/Volcano.svg"), width=6, height=5)
+g1
+```
+
+```{r, warning=FALSE, message=FALSE}
+ht_opt$message = FALSE #to make heatmap errors go away
+
+mymat <- norm_counts %>% 
+    data.frame() %>% 
+    filter(row.names(norm_counts) %in% ko_vs_WT_sig$ensembl_gene_id) %>%
+    dplyr::rename("KO_rep1"="whole_ko_12_S6", "KO_rep2"="whole_ko_9_S5",
+           "WT_rep1"="WT_P37_25_S1", "WT_rep2"="WT_P37_26_S2") %>%
+    dplyr::select(c("KO_rep1", "KO_rep2", "WT_rep1", "WT_rep2"))
+
+ha = HeatmapAnnotation(
+    Condition = c("KO", "KO", "WT", "WT"),
+    col = list(Condition = c("KO" = "orange", "WT" = "#5785C1")),
+    simple_anno_size = unit(0.5, "cm")
+)
+
+scaled_mat = t(scale(t(mymat)))
+ht <- Heatmap(scaled_mat, 
+              name = "Z-score", 
+              top_annotation = ha,
+              show_column_names = FALSE, 
+              show_row_names = FALSE,
+              cluster_columns = TRUE,
+              col = colorRamp2(c(-2, 0, 2), c("darkblue", "white", "#A30000")), 
+              heatmap_legend_param = list(direction="vertical", nrow=1),
+              row_title = "DE Genes", row_title_rot = 90, 
+              column_title = "Samples", column_title_rot = 0, 
+              column_title_side = "bottom", column_names_rot = 45,
+              use_raster = TRUE)
+draw(ht, merge_legend = TRUE)
+```
+
+```{r}
+pdf(file=paste0(output_dir, "figures/Heatmap.pdf"), height = 10, width = 10)
+draw(ht, merge_legend = TRUE)
+dev.off()
+```
+
+```{r, warning=FALSE, message=FALSE}
+ofinterest = c("DDIT4", "SPOCK2", "UNC5B")
+
+plot_df <- mymat %>% rownames_to_column() %>%
+    left_join(gene_info, by=c("rowname"="ensembl_gene_id")) %>% 
+  filter(hgnc_symbol %in% ofinterest) %>%
+  dplyr::select(-c("rowname", "entrezgene_id")) %>% 
+  tidyr::pivot_longer(cols=-c(hgnc_symbol), values_to='expr', names_to='sample') %>% 
+  mutate(condition = stringr::str_split(sample, "_", simplify = T)[,1]) %>%
+  mutate(condition = factor(condition, levels = c("WT", "KO"))) %>% 
+  mutate(hgnc_symbol = factor(hgnc_symbol, levels = ofinterest))
+
+g1 <- ggplot(plot_df, aes(x=condition, y=log2(expr), fill=condition)) + 
+    geom_boxplot() + 
+    geom_jitter(color="black", size=2, alpha=0.5, width = 0.1) +
+    facet_wrap(~hgnc_symbol, scales = "free_y") + 
+    #facet_wrap(~hgnc_symbol) + 
+    theme_bw() + xlab("") +
+    ylab("log2 Normalized Gene Expression") +   
+    ggtitle(" ") + 
+    scale_fill_manual(values=c("#FBA72A", "#5785C1")) + 
+    theme(text=element_text(size=12, face = "bold"),
+          strip.text.x = element_text(size = 16), 
+          plot.title = element_text(hjust = 0.5), 
+          legend.position = "none", 
+          axis.text.x = element_text(angle = 45, hjust = 1)) 
+g1
+ggsave(plot=g1, file=paste0(output_dir, "figures/BoxPlots.svg"), width=8, height=4)
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+suppressPackageStartupMessages({
+  library(GO.db)
+  library(clusterProfiler)
+  library(enrichplot)
+  library(GOSemSim)
+  library(DOSE)
+  library(org.Hs.eg.db)
+})
+
+hsGO <- godata('org.Hs.eg.db', ont="BP")
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+ego <- enrichGO(gene          = ko_vs_WT_sig$hgnc_symbol,
+                universe      = unique(ko_vs_WT_res$hgnc_symbol),
+                OrgDb         = org.Hs.eg.db,
+                ont           = "BP",
+                keyType = "SYMBOL",
+                pAdjustMethod = "BH")
+
+ego@result <- ego@result[ego@result$Count > 30 & ego@result$p.adjust < 0.05, ]
+ego_ko = ego@result
+
+dotplot(ego, showCategory=20, font.size = 6) + ggtitle("GO")
+```
+
+```{r, fig.width=20, warning=FALSE, message=FALSE}
+ego_ko_toplot = ego_ko %>% arrange(p.adjust) %>% head(n=15)
+
+color1 = c("axon development", "axonogenesis", "axon guidance", "neuron projection guidance", "cell morphogenesis involved in neuron differentiation")
+color2 = c("regulation of synapse organization", "synapse organization",  "regulation of synapse structure or activity")
+ego_ko_toplot$label_colors = "#5C5C5C"
+ego_ko_toplot[ego_ko_toplot$Description %in% color1, "label_colors"] = "darkorange3"
+ego_ko_toplot[ego_ko_toplot$Description %in% color2, "label_colors"] = "darkred"
+
+ego_ko_toplot$Description2 = paste0(ego_ko_toplot$Description, " (", ego_ko_toplot$ID, ")")
+ego_ko_toplot$GeneRatio2 = sapply(ego_ko_toplot$GeneRatio, function(x) eval(parse(text = x)))
+
+ego_ko_toplot = ego_ko_toplot %>% arrange(GeneRatio2) %>% 
+  mutate(Description2 = as.factor(Description2)) %>%
+  mutate(Description2 = factor(Description2, levels=Description2))
+
+g1 = ggplot(data = ego_ko_toplot, aes(x = GeneRatio2, y = Description2, size = Count)) + 
+  geom_point(aes(fill=-log10(p.adjust)), colour="black", pch=21) +
+  scale_fill_gradient(low = "#007094FF", high = "#7DCDB7")+
+  labs(x = "Gene Ratio", fill = "-log(adjusted pvalue)", size = "# DEX genes in category") +
+  theme_bw() + 
+  theme(axis.text.y = element_text(colour = ego_ko_toplot$label_colors)) + 
+  scale_y_discrete(labels = function(y) str_replace(y, "\\(", "\n(")) + #adds the newline between term and ID
+  #scale_y_discrete(labels = function(y) str_wrap(y, width = 40)) + #alternatively, you can add a newline on terms that are too long
+  ylab("") + 
+  xlab("Gene Ratio") + 
+  ggtitle("Top 15 Enriched GO terms")
+g1
+ggsave(plot=g1, file=paste0(output_dir, "figures/GOenrichment.svg"), width=10, height=6)
+```
+
+```{r, fig.height=6, fig.width=16, warning=FALSE, message=FALSE}
+ego <- pairwise_termsim(ego, method = "Wang", semData=hsGO)
+n = 5
+mycol = c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F8766D")[1:n]
+
+p2 <- suppressMessages(treeplot(ego, color="p.adjust", showCategory = 15, 
+               offset.params = list(bar_tree = 10, tiplab = 1.5),
+               cluster.params = list(color=mycol, n=n))) +  
+  scale_colour_gradientn(colors=c( "#7DCDB7", "#007094FF"),
+                      name = "adjusted pvalue") 
+  #theme(legend.position = "bottom") +
+p2$layers[[3]]$aes_params$size <- 3 # clusters
+p2$layers[[7]]$aes_params$size <- 3 #tree labels
+p2$layers[[4]]$aes_params$size = 2 # label linewidth
+p2
+```
+
+
+
+### CTCF vs WT
+```{r}
+res = lfcShrink(dds, coef=2, quiet = TRUE)
+ctcf_vs_WT_res <- res %>% as.data.frame() %>% 
+  rownames_to_column(var="ensembl_gene_id") %>% 
+  left_join(gene_info, by="ensembl_gene_id") 
+ctcf_vs_WT_sig <-  ctcf_vs_WT_res %>%
+  filter(!is.na(padj), padj < 0.05) %>% 
+  arrange(padj)
+```
+
+```{r}
+cat("Number of DEX genes:", nrow(ctcf_vs_WT_sig))
+ctcf_vs_WT_sig %>% 
+  kbl() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>% 
+  scroll_box(width = "800px", height = "400px")
+```
+
+```{r, warning=FALSE}
+amanda.volcano.plot(ctcf_vs_WT_res, title = "CTCF vs WT", 
+                    gene.list = ctcf_vs_WT_sig %>% head(n=50) %>% pull(hgnc_symbol), 
+                    FCcut = 0, Padjcut = 0.05) +
+  ylim(c(0,100)) #optional but there's a crazy sig gene at the top
+```
+
+```{r}
+ht_opt$message = FALSE #to make heatmap errors go away
+
+mymat <- norm_counts %>% 
+    data.frame() %>% 
+    filter(row.names(norm_counts) %in% ctcf_vs_WT_sig$ensembl_gene_id)
+
+scaled_mat = t(scale(t(mymat)))
+ht <- Heatmap(scaled_mat, name = "Z-score", 
+              show_column_names = TRUE, 
+              show_row_names = FALSE,
+              cluster_columns = TRUE,
+              heatmap_legend_param = list(direction="horizontal", nrow=1),
+              row_title = "DE Genes", row_title_rot = 90, 
+              column_title = "Samples", column_title_rot = 0, column_title_side = "bottom", column_names_rot = 45,
+              use_raster = TRUE)
+draw(ht, merge_legend = TRUE)
+```
+
+```{r, warning=FALSE, message=FALSE}
+ego <- enrichGO(gene          = ctcf_vs_WT_sig$hgnc_symbol,
+                universe      = unique(ctcf_vs_WT_res$hgnc_symbol),
+                OrgDb         = org.Hs.eg.db,
+                ont           = "ALL",
+                keyType = "SYMBOL",
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 0.01,
+                qvalueCutoff  = 0.05)
+dotplot(ego, showCategory=20, font.size = 6) + ggtitle("GO")
+```
+
+
+```{r class.source = 'fold-show'}
+write.csv(ko_vs_WT_sig, file=paste0(output_dir, "DE_ko_vs_WT.csv"))
+write.csv(ego_ko, file=paste0(output_dir, "GO_ko_vs_WT.csv"))
+write.csv(ctcf_vs_WT_sig, file=paste0(output_dir, "DE_ctcf_vs_WT.csv"))
+```
+
+
+```{r}
+save(norm_counts,
+     metadata,
+     gene_info,
+     dds,
+     ko_vs_WT_res,
+     ko_vs_WT_sig,
+     ego_ko,
+     ctcf_vs_WT_res,
+     ctcf_vs_WT_sig, file = paste0(output_dir, "figures/Plotting_checkpoint.Rdata"))
+```
+
+
+<details>
+  <summary>**KO vs CTCF out of curiosity**</summary>
+  
+```{r}
+metadata$condition <- relevel(metadata$condition, ref="ctcf")
+dds <- DESeqDataSetFromMatrix(countData = cts,
+                              colData = metadata,
+                              design = ~ condition)
+dds <- DESeq(dds)
+ddsnorm <- counts(dds, normalized=TRUE)
+resultsNames(dds)
+```
+
+```{r}
+res = lfcShrink(dds, coef=3, quiet = TRUE)
+ko_vs_ctcf_res <- res %>% as.data.frame() %>% 
+  rownames_to_column(var="ensembl_gene_id") %>% 
+  left_join(gene_info, by="ensembl_gene_id") 
+ko_vs_ctcf_sig <- ko_vs_ctcf_res %>% 
+  filter(!is.na(padj), padj < 0.05) %>% 
+  arrange(padj)
+```
+
+```{r}
+cat("Number of DEX genes:", nrow(ko_vs_ctcf_sig))
+ko_vs_ctcf_sig %>% 
+  kbl() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>% 
+  scroll_box(width = "800px", height = "400px")
+```
+
+```{r, warning=FALSE}
+amanda.volcano.plot(ko_vs_ctcf_res, title = "KO vs CTCF", 
+                    gene.list = ko_vs_ctcf_sig %>% head(n=50) %>% pull(hgnc_symbol), 
+                    FCcut = 0, Padjcut = 0.05) 
+```
+
+```{r}
+ht_opt$message = FALSE #to make heatmap errors go away
+
+mymat <- ddsnorm %>% 
+    data.frame() %>% 
+    filter(row.names(ddsnorm) %in% ko_vs_ctcf_sig$ensembl_gene_id)
+
+scaled_mat = t(scale(t(mymat)))
+ht <- Heatmap(scaled_mat, name = "Z-score", 
+              show_column_names = TRUE, 
+              show_row_names = FALSE,
+              cluster_columns = TRUE,
+              heatmap_legend_param = list(direction="horizontal", nrow=1),
+              row_title = "DE Genes", row_title_rot = 90, 
+              column_title = "Samples", column_title_rot = 0, column_title_side = "bottom", column_names_rot = 45,
+              use_raster = TRUE)
+draw(ht, merge_legend = TRUE)
+```
+
+
+```{r}
+#BiocManager::install("UpSetR")
+library("UpSetR")
+
+dex_df = data.frame("gene" = ko_vs_ctcf_res$ensembl_gene_id, 
+                 "KO_vs_CTCF" = 0,
+                 "KO_vs_WT" = 0,
+                 "CTCF_vs_WT" = 0)
+
+dex_df[dex_df$gene %in% ko_vs_ctcf_sig$ensembl_gene_id, "KO_vs_CTCF"] = 1
+dex_df[dex_df$gene %in% ko_vs_WT_sig$ensembl_gene_id, "KO_vs_WT"] = 1
+dex_df[dex_df$gene %in% ctcf_vs_WT_sig$ensembl_gene_id, "CTCF_vs_WT"] = 1
+
+upset(dex_df, sets = c("KO_vs_WT",  "CTCF_vs_WT"), sets.bar.color = "#56B4E9", order.by = "freq", empty.intersections = "off")
+upset(dex_df, sets.bar.color = "#56B4E9", order.by = "freq", empty.intersections = "off")
+```
+</details>
+
+
+```{r}
+sessionInfo()
+```
+
+
+
